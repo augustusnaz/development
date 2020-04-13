@@ -1,0 +1,249 @@
+version: '3.1'
+networks:
+  frontend:
+    driver: ${NETWORKS_DRIVER}
+  backend:
+    driver: ${NETWORKS_DRIVER}
+volumes:
+  mariadb:
+    driver: ${VOLUMES_DRIVER}
+  phpmyadmin:
+    driver: ${VOLUMES_DRIVER}
+  postgres:
+    driver: ${VOLUMES_DRIVER}
+  docker-in-docker:
+    driver: ${VOLUMES_DRIVER}
+services:
+  docker-in-docker:
+    image: docker:19.03-dind
+    restart: unless-stopped
+    container_name: docker
+    environment:
+      DOCKER_TLS_SAN: DNS:docker-in-docker
+    privileged: true
+    volumes:
+      - ${APP_CODE_PATH_HOST}:${APP_CODE_PATH_CONTAINER}
+      - docker-in-docker:/certs/client
+    expose:
+      - 2375
+    networks:
+      - backend
+  flask:
+    image: augustusnaz/flask
+    restart: unless-stopped
+    container_name: flask
+    ports:
+      - ${FLASK_PORT}:80
+      - ${FLASK_WS_PORT}:6001
+    tty: true
+    volumes:
+      - ${DATA_PATH_HOST}/flask/mysql:/var/lib/mysql/
+  mariadb:
+    image: mariadb:10.4
+    restart: unless-stopped
+    container_name: mariadb
+    command:
+      - '--character-set-server=utf8mb4'
+      - '--collation-server=utf8mb4_unicode_ci'
+    volumes:
+      - ${DATA_PATH_HOST}/mariadb:/var/lib/mysql
+      - ${MARIADB_ENTRYPOINT_INITDB}:/docker-entrypoint-initdb.d
+    ports:
+      - ${MARIADB_PORT}:3306
+    environment:
+      - TZ=${APP_TIMEZONE}
+      - MYSQL_ROOT_PASSWORD=${MARIADB_ROOT_PASSWORD}
+      - MYSQL_USER=${MARIADB_USER}
+      - MYSQL_PASSWORD=${MARIADB_PASSWORD}
+      - MYSQL_DATABASE=${MARIADB_DATABASE}
+    networks:
+      - backend
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    container_name: nginx
+    ports:
+      - ${NGINX_HOST_HTTP_PORT}:80
+      - ${NGINX_HOST_HTTPS_PORT}:443
+    volumes:
+      - ./nginx/sites/:/etc/nginx/conf.d/:ro
+      - ${APP_CODE_PATH_HOST}:${APP_CODE_PATH_CONTAINER}${APP_CODE_CONTAINER_FLAG}
+      - ${NGINX_HOST_LOG_PATH}:/var/log/nginx/
+      - ${NGINX_SSL_PATH}:/etc/ssl
+    depends_on:
+      - php-fpm
+    networks:
+      - frontend
+      - backend
+  php-fpm:
+    build:
+      context: ./php-fpm
+      args:
+        - CHANGE_SOURCE=${CHANGE_SOURCE}
+        - LARADOCK_PHP_VERSION=${PHP_VERSION}
+        - LARADOCK_PHALCON_VERSION=${PHALCON_VERSION}
+        - INSTALL_BZ2=${PHP_FPM_INSTALL_BZ2}
+        - INSTALL_GMP=${PHP_FPM_INSTALL_GMP}
+        - INSTALL_XDEBUG=${PHP_FPM_INSTALL_XDEBUG}
+        - INSTALL_PCOV=${PHP_FPM_INSTALL_PCOV}
+        - INSTALL_PHPDBG=${PHP_FPM_INSTALL_PHPDBG}
+        - INSTALL_BLACKFIRE=${INSTALL_BLACKFIRE}
+        - INSTALL_SSH2=${PHP_FPM_INSTALL_SSH2}
+        - INSTALL_SOAP=${PHP_FPM_INSTALL_SOAP}
+        - INSTALL_XSL=${PHP_FPM_INSTALL_XSL}
+        - INSTALL_SMB=${PHP_FPM_INSTALL_SMB}
+        - INSTALL_IMAP=${PHP_FPM_INSTALL_IMAP}
+        - INSTALL_MONGO=${PHP_FPM_INSTALL_MONGO}
+        - INSTALL_AMQP=${PHP_FPM_INSTALL_AMQP}
+        - INSTALL_CASSANDRA=${PHP_FPM_INSTALL_CASSANDRA}
+        - INSTALL_GEARMAN=${PHP_FPM_INSTALL_GEARMAN}
+        - INSTALL_MSSQL=${PHP_FPM_INSTALL_MSSQL}
+        - INSTALL_BCMATH=${PHP_FPM_INSTALL_BCMATH}
+        - INSTALL_PHPREDIS=${PHP_FPM_INSTALL_PHPREDIS}
+        - INSTALL_MEMCACHED=${PHP_FPM_INSTALL_MEMCACHED}
+        - INSTALL_OPCACHE=${PHP_FPM_INSTALL_OPCACHE}
+        - INSTALL_EXIF=${PHP_FPM_INSTALL_EXIF}
+        - INSTALL_AEROSPIKE=${PHP_FPM_INSTALL_AEROSPIKE}
+        - INSTALL_OCI8=${PHP_FPM_INSTALL_OCI8}
+        - INSTALL_MYSQLI=${PHP_FPM_INSTALL_MYSQLI}
+        - INSTALL_PGSQL=${PHP_FPM_INSTALL_PGSQL}
+        - INSTALL_PG_CLIENT=${PHP_FPM_INSTALL_PG_CLIENT}
+        - INSTALL_POSTGIS=${PHP_FPM_INSTALL_POSTGIS}
+        - INSTALL_INTL=${PHP_FPM_INSTALL_INTL}
+        - INSTALL_GHOSTSCRIPT=${PHP_FPM_INSTALL_GHOSTSCRIPT}
+        - INSTALL_LDAP=${PHP_FPM_INSTALL_LDAP}
+        - INSTALL_PHALCON=${PHP_FPM_INSTALL_PHALCON}
+        - INSTALL_SWOOLE=${PHP_FPM_INSTALL_SWOOLE}
+        - INSTALL_TAINT=${PHP_FPM_INSTALL_TAINT}
+        - INSTALL_IMAGE_OPTIMIZERS=${PHP_FPM_INSTALL_IMAGE_OPTIMIZERS}
+        - INSTALL_IMAGEMAGICK=${PHP_FPM_INSTALL_IMAGEMAGICK}
+        - INSTALL_CALENDAR=${PHP_FPM_INSTALL_CALENDAR}
+        - INSTALL_FAKETIME=${PHP_FPM_INSTALL_FAKETIME}
+        - INSTALL_IONCUBE=${PHP_FPM_INSTALL_IONCUBE}
+        - INSTALL_APCU=${PHP_FPM_INSTALL_APCU}
+        - INSTALL_CACHETOOL=${PHP_FPM_INSTALL_CACHETOOL}
+        - INSTALL_YAML=${PHP_FPM_INSTALL_YAML}
+        - INSTALL_RDKAFKA=${PHP_FPM_INSTALL_RDKAFKA}
+        - INSTALL_GETTEXT=${PHP_FPM_INSTALL_GETTEXT}
+        - INSTALL_ADDITIONAL_LOCALES=${PHP_FPM_INSTALL_ADDITIONAL_LOCALES}
+        - INSTALL_MYSQL_CLIENT=${PHP_FPM_INSTALL_MYSQL_CLIENT}
+        - INSTALL_PING=${PHP_FPM_INSTALL_PING}
+        - INSTALL_SSHPASS=${PHP_FPM_INSTALL_SSHPASS}
+        - INSTALL_MAILPARSE=${PHP_FPM_INSTALL_MAILPARSE}
+        - INSTALL_PCNTL=${PHP_FPM_INSTALL_PCNTL}
+        - ADDITIONAL_LOCALES=${PHP_FPM_ADDITIONAL_LOCALES}
+        - INSTALL_FFMPEG=${PHP_FPM_FFMPEG}
+        - INSTALL_WKHTMLTOPDF=${PHP_FPM_INSTALL_WKHTMLTOPDF}
+        - INSTALL_XHPROF=${PHP_FPM_INSTALL_XHPROF}
+        - PUID=${PHP_FPM_PUID}
+        - PGID=${PHP_FPM_PGID}
+        - LOCALE=${PHP_FPM_DEFAULT_LOCALE}
+        - http_proxy
+        - https_proxy
+        - no_proxy
+    image: php-fpm${PHP_VERSION}
+    container_name: php-fpm${PHP_VERSION}
+    restart: unless-stopped
+    volumes:
+      - ./php-fpm/php${PHP_VERSION}.ini:/usr/local/etc/php/php.ini
+      - ${APP_CODE_PATH_HOST}:${APP_CODE_PATH_CONTAINER}${APP_CODE_CONTAINER_FLAG}
+      - docker-in-docker:/certs/client
+      - ${HOST_LOG_PATH}/php-fpm/:/var/log/
+    expose:
+      - 9000
+    extra_hosts:
+      - dockerhost:${DOCKER_HOST_IP}
+    environment:
+      - PHP_IDE_CONFIG=${PHP_IDE_CONFIG}
+      - DOCKER_HOST=tcp://docker-in-docker:2376
+      - DOCKER_TLS_VERIFY=1
+      - DOCKER_TLS_CERTDIR=/certs
+      - DOCKER_CERT_PATH=/certs/client
+      - FAKETIME=${PHP_FPM_FAKETIME}
+    networks:
+      - backend
+    links:
+      - docker-in-docker
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: phpmyadmin
+    environment:
+      PMA_HOST: ${PMA_DB_ENGINE}
+    ports:
+      - ${PMA_PORT}:80
+    depends_on:
+      - ${PMA_DB_ENGINE}
+    restart: unless-stopped
+    networks:
+      - frontend
+      - backend
+  redis:
+    image: redis:latest
+    container_name: redis
+    restart: unless-stopped
+    volumes:
+      - ${DATA_PATH_HOST}/redis:/data
+    ports:
+      - ${REDIS_PORT}:6379
+    networks:
+      - backend
+  sonarqube:
+    image: sonarqube
+    container_name: sonarqube
+    hostname: ${SONARQUBE_HOSTNAME}
+    volumes:
+      - ${DATA_PATH_HOST}/sonarqube/conf:/opt/sonarqube/conf
+      - ${DATA_PATH_HOST}/sonarqube/data:/opt/sonarqube/data
+      - ${DATA_PATH_HOST}/sonarqube/logs:/opt/sonarqube/logs
+      - ${DATA_PATH_HOST}/sonarqube/extensions:/opt/sonarqube/extensions
+      - ${DATA_PATH_HOST}/sonarqube/plugins:/opt/sonarqube/lib/bundled-plugins
+    ports:
+      - ${SONARQUBE_PORT}:9000
+    depends_on:
+      - postgres
+    networks:
+      - backend
+      - frontend
+  postgres:
+    image: postgres
+    container_name: postgres
+    volumes:
+      - ${POSTGRES_ENTRYPOINT_INITDB}:/docker-entrypoint-initdb.d
+    ports:
+      - ${POSTGRES_PORT}:5432
+    networks:
+      - backend
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - SONARQUBE_POSTGRES_INIT=${SONARQUBE_POSTGRES_INIT}
+      - SONARQUBE_POSTGRES_DB=${SONARQUBE_POSTGRES_DB}
+      - SONARQUBE_POSTGRES_USER=${SONARQUBE_POSTGRES_USER}
+      - SONARQUBE_POSTGRES_PASSWORD=${SONARQUBE_POSTGRES_PASSWORD}
+  workspace:
+    build:
+      context: ./workspace
+      args:
+        - PHP_VERSION=${PHP_VERSION}
+        - INSTALL_ANSIBLE=${INSTALL_ANSIBLE}
+    image: workspace
+    container_name: workspace
+    restart: unless-stopped
+    volumes:
+      - ./php-fpm/php${PHP_VERSION}.ini:/usr/local/etc/php/php.ini
+      - ${APP_CODE_PATH_HOST}:/var/src
+      - ${HOST_LOG_PATH}/workspace/php/:/var/log/
+    extra_hosts:
+      - dockerhost:${DOCKER_HOST_IP}
+    ports:
+      - 8000:8000
+    tty: true
+    networks:
+      - backend
+    depends_on:
+      - php-fpm
+      - redis
+      - mariadb
+    links:
+      - docker-in-docker

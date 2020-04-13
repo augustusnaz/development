@@ -1,0 +1,7 @@
+.env
+docker
+data
+log
+nginx/sites/*
+!nginx/sites/localapp.conf.example
+!nginx/sites/website.conf.example
